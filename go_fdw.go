@@ -2,8 +2,9 @@ package fdw
 
 /*
 #include "postgres.h"
-#include "funcapi.h"
 #include "foreign/fdwapi.h"
+
+#include "funcapi.h"
 #include "nodes/makefuncs.h"
 #include "optimizer/pathnode.h"
 
@@ -77,28 +78,6 @@ goExtractBareClauses(List *restrictinfo_list)
 	return extract_actual_clauses(restrictinfo_list, false);
 }
 
-static inline List *
-goOptionsServer(List *options, Oid serverOid)
-{
-	ForeignServer *f_server = GetForeignServer(serverOid);
-	//UserMapping *f_mapping = GetUserMapping(GetUserId(), f_server->serverid);
-
-	options = list_concat(options, f_server->options);
-	//options = list_concat(options, f_mapping->options);
-
-	return options;
-}
-
-static inline List *
-goOptionsTable(List *options, Oid tableOid)
-{
-	ForeignTable *f_table = GetForeignTable(tableOid);
-
-	options = goOptionsServer(options, f_table->serverid);
-
-	return list_concat(options, f_table->options);
-}
-
 static inline Oid
 goSlotGetTypeOid(TupleTableSlot *slot, int i)
 {
@@ -150,18 +129,14 @@ func (a attribute) TypeOid() uint {
 }
 
 type execState struct {
+	scanCost ScanCostEstimate
+	scanPath ScanPath
+
 	iterator Iterator
-	private  interface{}
 
 	attributes []Attribute
 	attinmeta  *C.AttInMetadata
 	slot       *C.TupleTableSlot
-}
-
-type planState struct {
-	estimatedStartup float64
-	estimatedTotal   float64
-	private          interface{}
 }
 
 func makeOptions(defElems *C.List) map[string]string {
@@ -203,36 +178,32 @@ func Initialize(handler Handler, fdwRoutine interface{}) {
 func goGetForeignRelSize(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntableid C.Oid) {
 	log.Printf("%p GetForeignRelSize", root)
 
-	cost := ScanCostEstimate{
+	state := new(execState)
+	state.scanPath = initialized.handler.Scan(table{foreigntableid})
+	state.scanCost = state.scanPath.Estimate(ScanCostEstimate{
 		Rows:  float64(baserel.rows),
 		Width: int(baserel.reltarget.width),
-	}
-	options := makeOptions(C.goOptionsTable(nil, foreigntableid))
+	})
 
-	state := new(planState)
+	baserel.rows = C.double(state.scanCost.Rows)
+	baserel.reltarget.width = C.int(state.scanCost.Width)
 
-	initialized.plans.Store(root, state)
-	initialized.handler.EstimateScan(options, &cost, &state.private)
-
-	baserel.rows = C.double(cost.Rows)
-	baserel.reltarget.width = C.int(cost.Width)
-	state.estimatedStartup = cost.Startup
-	state.estimatedTotal = cost.Total
+	initialized.execs.Store(root, state)
 }
 
 //export goGetForeignPaths
 func goGetForeignPaths(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntableid C.Oid) {
 	log.Printf("%p GetForeignPaths", root)
 
-	state := initialized.plans.Load(root)
+	state := initialized.execs.Load(root)
 
 	// 1. full scan
 	C.goAddForeignScanPath(root,
 		baserel, nil,
 		baserel.rows,
-		C.Cost(state.estimatedStartup),
-		C.Cost(state.estimatedTotal),
-		nil, nil, nil, nil)
+		C.Cost(state.scanCost.Startup),
+		C.Cost(state.scanCost.Total),
+		nil, nil, nil, nil /* private */)
 
 	// 2. sorted result
 	// ask the handler if it is okay with _all_ the pathkeys
@@ -248,17 +219,18 @@ func goGetForeignPlan(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntableid
 	best_path *C.ForeignPath, tlist *C.List, scan_clauses *C.List, outer_plan *C.Plan,
 ) *C.ForeignScan {
 	log.Printf("%p GetForeignPlan", root)
-	log.Printf("ftid: %v", foreigntableid)
 
-	//state := initialized.plans.Load(root)
-	initialized.plans.Delete(root)
+	id := C.lcons(nil, nil)
+	state := initialized.execs.Load(root)
+	initialized.execs.Delete(root)
+	initialized.execs.Store(unsafe.Pointer(id), state)
 
 	return C.make_foreignscan(
 		tlist,
 		C.goExtractBareClauses(scan_clauses),
 		baserel.relid,
 		nil, // TODO parameters
-		best_path.fdw_private, // TODO pass forward some identifier...
+		id,
 		nil, // TODO custom tlist
 		nil, // TODO remote quals
 		outer_plan)
@@ -272,39 +244,32 @@ func goGetForeignPlan(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntableid
 func goBeginForeignScan(node *C.ForeignScanState, eflags C.int) {
 	log.Printf("%p BeginForeignScan", node)
 
-	state := new(execState)
-	initialized.execs.Store(node, state)
+	fs := (*C.ForeignScan)(unsafe.Pointer(node.ss.ps.plan))
+	node.fdw_state = unsafe.Pointer(fs.fdw_private)
+
+	state := initialized.execs.Load(node.fdw_state)
 
 	// TODO call the handler
 	if eflags&C.EXEC_FLAG_EXPLAIN_ONLY != 0 {
 		return
 	}
 
-	/* TODO figure out how to pass private information from planning to executing */
-	fs := (*C.ForeignScan)(unsafe.Pointer(node.ss.ps.plan))
-	rte := (*C.RangeTblEntry)(C.list_nth(node.ss.ps.state.es_range_table, C.int(fs.scan.scanrelid)-1))
-	options := makeOptions(C.goOptionsTable(nil, rte.relid))
-	/* */
-
 	descriptor := node.ss.ss_ScanTupleSlot.tts_tupleDescriptor
 
 	state.attributes = make([]Attribute, descriptor.natts)
 	state.attinmeta = C.TupleDescGetAttInMetadata(descriptor)
-	state.iterator = initialized.handler.Scan(options)
+	state.iterator = state.scanPath.Begin()
 
 	for i, _ := range state.attributes {
 		state.attributes[i] = attribute{index: C.int(i), state: state}
 	}
-
-	//node.fdw_state
-	// palloc0(sizeof(void *));
 }
 
 //export goIterateForeignScan
 func goIterateForeignScan(node *C.ForeignScanState) *C.TupleTableSlot {
 	log.Printf("%p IterateForeignScan", node)
 
-	state := initialized.execs.Load(node)
+	state := initialized.execs.Load(node.fdw_state)
 	state.slot = node.ss.ss_ScanTupleSlot
 
 	C.goClearTupleSlot(state.slot)
@@ -340,10 +305,11 @@ func goReScanForeignScan(node *C.ForeignScanState) {
 func goEndForeignScan(node *C.ForeignScanState) {
 	log.Printf("%p EndForeignScan", node)
 
-	state := initialized.execs.Load(node)
-	initialized.execs.Delete(node)
+	state := initialized.execs.Load(node.fdw_state)
+	initialized.execs.Delete(node.fdw_state)
 
 	if state.iterator != nil {
 		state.iterator.Close() // TODO error
 	}
+	state.scanPath.Close()
 }

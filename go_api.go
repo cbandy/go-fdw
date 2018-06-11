@@ -3,14 +3,7 @@ package fdw
 // https://www.postgresql.org/docs/current/static/ddl-foreign-data.html
 
 type Handler interface {
-	// called before GetForeignRelSize and GetForeignPaths
-	// sufficient before full scan
-	EstimateScan(options map[string]string, cost *ScanCostEstimate, private *interface{}) // TODO quals; tlist?
-
-	Scan(
-		options map[string]string, // could go away if require user to store in private
-		// the plan (scan, thus far)
-	) Iterator
+	Scan(table Table) ScanPath
 }
 
 //type CostEstimate struct {
@@ -35,9 +28,31 @@ type Iterator interface {
 	// TODO rescan (parameters could change)
 }
 
+type Options interface {
+	Server() map[string]string
+	Table() map[string]string
+	User() map[string]string
+}
+
+type Relation interface {
+	Name() string
+}
+
 type ScanCostEstimate struct {
 	Rows    float64 // number of tuples
 	Width   int     // average width of tuples
 	Startup float64
 	Total   float64
+}
+
+type ScanPath interface {
+	Estimate(ScanCostEstimate) ScanCostEstimate
+	Begin() Iterator
+	Close()
+}
+
+type Table interface {
+	Oid() uint
+	Options(func(Options))
+	Relation(func(Relation))
 }

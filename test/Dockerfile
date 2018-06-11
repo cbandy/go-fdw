@@ -10,10 +10,3 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     && apt-get install --no-install-recommends --yes "postgresql-common" \
     && echo 'create_main_cluster = false' >> /etc/postgresql-common/createcluster.conf \
     && apt-get install --no-install-recommends --yes "postgresql-${PG_MAJOR}" "postgresql-server-dev-${PG_MAJOR}"
-
-COPY .  /go/src/github.com/cbandy/go-fdw
-WORKDIR /go/src/github.com/cbandy/go-fdw/test
-
-RUN make clean all install
-RUN chown -R postgres: . && su -c 'make REGRESS_OPTS="--temp-instance=$(mktemp -d)" installcheck' postgres \
-    || { rc=$? ; cat regression.diffs log/postmaster.log ; exit $rc ; }
