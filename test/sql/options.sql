@@ -1,7 +1,5 @@
 -- vim: set expandtab shiftwidth=2 syntax=pgsql tabstop=2 :
 
-CREATE EXTENSION go_test_fdw;
-
 --
 -- no server options
 --
@@ -71,3 +69,8 @@ OPTIONS (eins 'zwei', drei 'vier');
 
 -- expect non-empty set
 SELECT * FROM user_options ORDER BY option;
+
+--
+-- cleanup
+--
+DROP SERVER few, none CASCADE;

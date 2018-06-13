@@ -9,7 +9,7 @@ DATA = go_test_fdw--1.0.sql
 
 EXTRA_CLEAN = go_test_fdw.a go_test_fdw.h
 
-REGRESS = options
+REGRESS = --load-extension=$(MODULE_big) options joins
 
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
