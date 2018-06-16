@@ -75,18 +75,21 @@ type scan struct {
 	slot       *C.TupleTableSlot
 }
 
-var scans = map[unsafe.Pointer]*scan{}
+var scans = map[*C.ForeignScanState]*scan{}
 
 //export goBeginForeignScan
 func goBeginForeignScan(node *C.ForeignScanState, eflags C.int) {
-	log.Printf("%p BeginForeignScan", node)
+	log.Printf("BeginForeignScan   (%p) Relation: %v", node, node.ss.ss_currentRelation.rd_id)
 
 	// C.CurrentMemoryContext.name == "ExecutorState"
 
-	fs := (*C.ForeignScan)(unsafe.Pointer(node.ss.ps.plan))
+	if len(paths) > 0 {
+		panic("Expected paths to be empty")
+	}
 
-	state := new(scan)
-	state.plan = plans[fs.fdw_private]
+	fs := (*C.ForeignScan)(unsafe.Pointer(node.ss.ps.plan))
+	state := &scan{plan: plans[fs]}
+	delete(plans, fs)
 
 	// TODO call the handler
 	if eflags&C.EXEC_FLAG_EXPLAIN_ONLY != 0 {
@@ -103,18 +106,21 @@ func goBeginForeignScan(node *C.ForeignScanState, eflags C.int) {
 		state.attributes[i] = attribute{index: C.int(i), state: state}
 	}
 
-	node.fdw_state = unsafe.Pointer(fs.fdw_private)
-	scans[node.fdw_state] = state
+	scans[node] = state
 }
 
 //export goIterateForeignScan
 func goIterateForeignScan(node *C.ForeignScanState) *C.TupleTableSlot {
-	log.Printf("%p IterateForeignScan", node)
+	log.Printf("IterateForeignScan (%p)", node)
 
 	// C.CurrentMemoryContext.parent.name == "ExecutorState"
 	// C.CurrentMemoryContext.name == "ExprContext"
 
-	state := scans[node.fdw_state]
+	if len(plans) > 0 {
+		panic("Expected plans to be empty")
+	}
+
+	state := scans[node]
 	state.slot = node.ss.ss_ScanTupleSlot
 
 	C.goClearTupleSlot(state.slot)
@@ -148,12 +154,12 @@ func goReScanForeignScan(node *C.ForeignScanState) {
 
 //export goEndForeignScan
 func goEndForeignScan(node *C.ForeignScanState) {
-	log.Printf("%p EndForeignScan", node)
+	log.Printf("EndForeignScan     (%p) Relation: %v", node, node.ss.ss_currentRelation.rd_id)
 
 	// C.CurrentMemoryContext.name == "ExecutorState"
 
-	state := scans[node.fdw_state]
-	delete(scans, node.fdw_state)
+	state := scans[node]
+	delete(scans, node)
 
 	if state.iterator != nil {
 		state.iterator.Close() // TODO error

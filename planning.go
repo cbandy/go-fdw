@@ -44,11 +44,11 @@ var paths = map[*C.RelOptInfo]*struct {
 	scanPath ScanPath
 }{}
 
-var plans = map[*C.List]ScanPath{} // TODO generic plan
+var plans = map[*C.ForeignScan]ScanPath{} // TODO generic plan
 
 //export goGetForeignRelSize
 func goGetForeignRelSize(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntableid C.Oid) {
-	log.Printf("%p GetForeignRelSize(%p, %v)", root, baserel, foreigntableid)
+	log.Printf("GetForeignRelSize (%p, %p, %v)", root, baserel, foreigntableid)
 
 	if C.CurrentMemoryContext != C.MessageContext {
 		panic("Unexpected memory context")
@@ -80,7 +80,7 @@ func goGetForeignRelSize(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntabl
 
 //export goGetForeignPaths
 func goGetForeignPaths(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntableid C.Oid) {
-	log.Printf("%p GetForeignPaths(%p, %v)", root, baserel, foreigntableid)
+	log.Printf("GetForeignPaths   (%p, %p, %v)", root, baserel, foreigntableid)
 
 	if C.CurrentMemoryContext != C.MessageContext {
 		panic("Unexpected memory context")
@@ -109,25 +109,25 @@ func goGetForeignPaths(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntablei
 func goGetForeignPlan(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntableid C.Oid,
 	best_path *C.ForeignPath, tlist *C.List, scan_clauses *C.List, outer_plan *C.Plan,
 ) *C.ForeignScan {
-	log.Printf("%p GetForeignPlan(%p, %v)", root, baserel, foreigntableid)
+	log.Printf("GetForeignPlan    (%p, %p, %v, %p)", root, baserel, foreigntableid, best_path)
 
 	if C.CurrentMemoryContext != C.MessageContext {
 		panic("Unexpected memory context")
 	}
 
 	state := paths[baserel]
-
-	id := C.lcons(nil, nil)
-	plans[id] = state.scanPath
 	delete(paths, baserel)
 
-	return C.make_foreignscan(
+	fs := C.make_foreignscan(
 		tlist,
 		C.goExtractBareClauses(scan_clauses),
 		baserel.relid,
 		nil, // TODO parameters
-		id,
+		nil,
 		nil, // TODO custom tlist
 		nil, // TODO remote quals
 		outer_plan)
+
+	plans[fs] = state.scanPath
+	return fs
 }
