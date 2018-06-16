@@ -1,7 +1,7 @@
 -- vim: set expandtab shiftwidth=2 syntax=pgsql tabstop=2 :
 
 --
--- no server options
+DO $$ BEGIN RAISE INFO 'no server options'; END $$;
 --
 CREATE SERVER none FOREIGN DATA WRAPPER go_test_fdw;
 CREATE FOREIGN TABLE server_options (option text, value text)
@@ -11,7 +11,7 @@ SERVER none;
 SELECT * FROM server_options ORDER BY option;
 
 --
--- some server options
+DO $$ BEGIN RAISE INFO 'some server options'; END $$;
 --
 DROP FOREIGN TABLE server_options;
 CREATE SERVER few FOREIGN DATA WRAPPER go_test_fdw
@@ -23,7 +23,7 @@ SERVER few;
 SELECT * FROM server_options ORDER BY option;
 
 --
--- no table options
+DO $$ BEGIN RAISE INFO 'no table options'; END $$;
 --
 CREATE FOREIGN TABLE table_options (option text, value text)
 SERVER few;
@@ -32,7 +32,7 @@ SERVER few;
 SELECT * FROM table_options ORDER BY option;
 
 --
--- some table options
+DO $$ BEGIN RAISE INFO 'some table options'; END $$;
 --
 DROP FOREIGN TABLE table_options;
 CREATE FOREIGN TABLE table_options (option text, value text)
@@ -43,7 +43,7 @@ OPTIONS (ichi 'ni', san 'shi');
 SELECT * FROM table_options ORDER BY option;
 
 --
--- no user mapping
+DO $$ BEGIN RAISE INFO 'no user mapping'; END $$;
 --
 CREATE FOREIGN TABLE user_options (option text, value text)
 SERVER few;
@@ -52,7 +52,7 @@ SERVER few;
 SELECT * FROM user_options ORDER BY option;
 
 --
--- empty user mapping
+DO $$ BEGIN RAISE INFO 'empty user mapping'; END $$;
 --
 CREATE USER MAPPING FOR PUBLIC
 SERVER few;
@@ -61,7 +61,7 @@ SERVER few;
 SELECT * FROM user_options ORDER BY option;
 
 --
--- some user mapping
+DO $$ BEGIN RAISE INFO 'some user mapping'; END $$;
 --
 CREATE USER MAPPING FOR postgres
 SERVER few

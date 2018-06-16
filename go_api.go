@@ -2,6 +2,10 @@ package fdw
 
 // https://www.postgresql.org/docs/current/static/ddl-foreign-data.html
 
+type FDW interface {
+	New() Handler
+}
+
 type Handler interface {
 	Scan(table Table) ScanPath
 }
@@ -13,10 +17,9 @@ type Handler interface {
 //}
 
 type Attribute interface {
-	// FIXME terrible names
-	SetText([]byte)  // error?
-	SetText0([]byte) // error?
-	SetText2(string) // error?
+	SetText([]byte)   // error? // same as SetText0, but slice is copied first to NUL-terminate
+	SetText0([]byte)  // error?
+	SetString(string) // error? // same as SetText0, but string is copied first to NUL-terminate
 	TypeOid() uint
 	// type name?
 }
