@@ -64,3 +64,10 @@ SELECT * FROM one RIGHT JOIN two USING (id) ORDER BY id;
   5 |      | n
 (4 rows)
 
+--
+-- cleanup
+--
+DROP SERVER none CASCADE;
+NOTICE:  drop cascades to 2 other objects
+DETAIL:  drop cascades to foreign table one
+drop cascades to foreign table two

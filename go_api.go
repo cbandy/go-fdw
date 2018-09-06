@@ -7,7 +7,7 @@ type FDW interface {
 }
 
 type Handler interface {
-	Scan(table Table) ScanPath
+	Scan(table Table) (ScanPath, error)
 }
 
 //type CostEstimate struct {
@@ -17,24 +17,23 @@ type Handler interface {
 //}
 
 type Attribute interface {
-	SetText([]byte)   // error? // same as SetText0, but slice is copied first to NUL-terminate
-	SetText0([]byte)  // error?
-	SetString(string) // error? // same as SetText0, but string is copied first to NUL-terminate
+	SetText([]byte) error   // same as SetText0, but slice is copied first to NUL-terminate
+	SetText0([]byte) error  //
+	SetString(string) error // same as SetText0, but string is copied first to NUL-terminate
 	TypeOid() uint
 	// type name?
 }
 
 type Iterator interface {
-	Close() // TODO error
-	HasNext() bool
-	Next([]Attribute) // TODO error
+	Close() error
+	Next([]Attribute) (bool, error)
 	// TODO rescan (parameters could change)
 }
 
 type Options interface {
 	Server() map[string]string
 	Table() map[string]string
-	User() map[string]string
+	User() (map[string]string, error) // returns an error when the user mapping does not exist
 }
 
 type Relation interface {
@@ -49,9 +48,9 @@ type ScanCostEstimate struct {
 }
 
 type ScanPath interface {
-	Estimate(ScanCostEstimate) ScanCostEstimate
-	Begin() Iterator
-	Close()
+	Estimate(ScanCostEstimate) (ScanCostEstimate, error)
+	Begin() (Iterator, error)
+	Close() error
 }
 
 type Table interface {

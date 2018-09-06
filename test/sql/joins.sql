@@ -32,3 +32,8 @@ SELECT * FROM one LEFT JOIN two USING (id) ORDER BY id;
 DO $$ BEGIN RAISE INFO 'fdw right join'; END $$;
 --
 SELECT * FROM one RIGHT JOIN two USING (id) ORDER BY id;
+
+--
+-- cleanup
+--
+DROP SERVER none CASCADE;

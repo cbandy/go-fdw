@@ -5,9 +5,7 @@ package fdw
 // Executing
 
 /*
-#include "postgres.h"
-#include "foreign/fdwapi.h"
-
+#include "go_fdw.h"
 #include "funcapi.h"
 
 static inline void
@@ -24,12 +22,27 @@ goSlotGetTypeOid(TupleTableSlot *slot, int i)
 	return slot->tts_tupleDescriptor->attrs[i]->atttypid;
 }
 
-static inline void
+static ErrorData *
 goSlotSetText(TupleTableSlot *slot, AttInMetadata *attinmeta, int i, char *value)
 {
-	slot->tts_isnull[i] = (value == NULL) ? true : false;
-	slot->tts_values[i] = InputFunctionCall(
-		&attinmeta->attinfuncs[i], value, attinmeta->attioparams[i], attinmeta->atttypmods[i]);
+	volatile MemoryContext context = CurrentMemoryContext;
+	ErrorData *edata = NULL;
+
+	PG_TRY();
+	{
+		slot->tts_isnull[i] = (value == NULL) ? true : false;
+		slot->tts_values[i] = InputFunctionCall(
+			&attinmeta->attinfuncs[i], value, attinmeta->attioparams[i], attinmeta->atttypmods[i]);
+	}
+	PG_CATCH();
+	{
+		MemoryContextSwitchTo(context);
+		edata = CopyErrorData();
+		FlushErrorState();
+	}
+	PG_END_TRY();
+
+	return edata;
 }
 */
 import "C"
@@ -43,22 +56,22 @@ type attribute struct {
 	state *scan
 }
 
-func (a attribute) SetText(input []byte) {
+func (a attribute) SetText(input []byte) error {
 	buffer := make([]byte, len(input)+1)
 	buffer[len(input)] = 0
 	copy(buffer, input)
-	a.SetText0(buffer)
+	return a.SetText0(buffer)
 }
 
-func (a attribute) SetText0(input []byte) {
-	C.goSlotSetText(a.state.slot, a.state.attinmeta, a.index, (*C.char)(unsafe.Pointer(&input[0])))
+func (a attribute) SetText0(input []byte) error {
+	return goErrorData(C.goSlotSetText(a.state.slot, a.state.attinmeta, a.index, (*C.char)(unsafe.Pointer(&input[0]))))
 }
 
-func (a attribute) SetString(input string) {
+func (a attribute) SetString(input string) error {
 	buffer := make([]byte, len(input)+1)
 	buffer[len(input)] = 0
 	copy(buffer, input)
-	a.SetText0(buffer)
+	return a.SetText0(buffer)
 }
 
 func (a attribute) TypeOid() uint {
@@ -78,7 +91,7 @@ type scan struct {
 var scans = map[*C.ForeignScanState]*scan{}
 
 //export goBeginForeignScan
-func goBeginForeignScan(node *C.ForeignScanState, eflags C.int) {
+func goBeginForeignScan(node *C.ForeignScanState, eflags C.int) *C.ErrorData {
 	log.Printf("BeginForeignScan   (%p) Relation: %v", node, node.ss.ss_currentRelation.rd_id)
 
 	// C.CurrentMemoryContext.name == "ExecutorState"
@@ -93,24 +106,33 @@ func goBeginForeignScan(node *C.ForeignScanState, eflags C.int) {
 
 	// TODO call the handler
 	if eflags&C.EXEC_FLAG_EXPLAIN_ONLY != 0 {
-		return
+		return nil
 	}
 
 	descriptor := node.ss.ss_ScanTupleSlot.tts_tupleDescriptor
 
+	var err error
 	state.attributes = make([]Attribute, descriptor.natts)
 	state.attinmeta = C.TupleDescGetAttInMetadata(descriptor)
-	state.iterator = state.plan.Begin()
+	state.iterator, err = state.plan.Begin()
+
+	if err != nil {
+		// TODO close()?
+		initialized.handler = nil
+		return pgErrorData(err)
+	}
 
 	for i, _ := range state.attributes {
 		state.attributes[i] = attribute{index: C.int(i), state: state}
 	}
 
 	scans[node] = state
+
+	return nil
 }
 
 //export goIterateForeignScan
-func goIterateForeignScan(node *C.ForeignScanState) *C.TupleTableSlot {
+func goIterateForeignScan(node *C.ForeignScanState) C.struct_goIterateForeignScanResult {
 	log.Printf("IterateForeignScan (%p)", node)
 
 	// C.CurrentMemoryContext.parent.name == "ExecutorState"
@@ -125,12 +147,16 @@ func goIterateForeignScan(node *C.ForeignScanState) *C.TupleTableSlot {
 
 	C.goClearTupleSlot(state.slot)
 
-	if state.iterator.HasNext() {
-		state.iterator.Next(state.attributes)
+	if ok, err := state.iterator.Next(state.attributes); err != nil {
+		delete(scans, node)
+		// TODO close()?
+		initialized.handler = nil
+		return C.struct_goIterateForeignScanResult{edata: pgErrorData(err)}
+	} else if ok {
 		C.ExecStoreVirtualTuple(state.slot)
 	}
 
-	return state.slot
+	return C.struct_goIterateForeignScanResult{slot: state.slot}
 
 	// ExecStoreTuple(something, slot, InvalidBuffer, false);
 
@@ -153,7 +179,7 @@ func goReScanForeignScan(node *C.ForeignScanState) {
 }
 
 //export goEndForeignScan
-func goEndForeignScan(node *C.ForeignScanState) {
+func goEndForeignScan(node *C.ForeignScanState) *C.ErrorData {
 	log.Printf("EndForeignScan     (%p) Relation: %v", node, node.ss.ss_currentRelation.rd_id)
 
 	// C.CurrentMemoryContext.name == "ExecutorState"
@@ -161,13 +187,20 @@ func goEndForeignScan(node *C.ForeignScanState) {
 	state := scans[node]
 	delete(scans, node)
 
+	var edata *C.ErrorData
 	if state.iterator != nil {
-		state.iterator.Close() // TODO error
+		if err := state.iterator.Close(); err != nil {
+			edata = pgErrorData(err)
+		}
 	}
-	state.plan.Close()
+	if err := state.plan.Close(); edata == nil && err != nil {
+		edata = pgErrorData(err)
+	}
 
 	if len(scans) == 0 {
 		// TODO close()?
 		initialized.handler = nil
 	}
+
+	return edata
 }

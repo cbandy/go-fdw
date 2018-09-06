@@ -1,32 +1,38 @@
 package fdw
 
 /*
-#include "postgres.h"
-#include "foreign/fdwapi.h"
-
+#include "go_fdw.h"
 #include "utils/memutils.h"
 
-void goGetForeignRelSize
-(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
+void
+goGetForeignRelSizeWrapper(
+	PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
+{
+	ErrorData *edata = goGetForeignRelSize(root, baserel, foreigntableid);
+	if (edata) ReThrowError(edata);
+}
 
-void goGetForeignPaths
-(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
+void
+goBeginForeignScanWrapper(ForeignScanState *node, int eflags)
+{
+	ErrorData *edata = goBeginForeignScan(node, eflags);
+	if (edata) ReThrowError(edata);
+}
 
-ForeignScan *goGetForeignPlan
-(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid,
- ForeignPath *best_path, List *tlist, List *scan_clauses, Plan *outer_plan);
+TupleTableSlot *
+goIterateForeignScanWrapper(ForeignScanState *node)
+{
+	struct goIterateForeignScanResult result = goIterateForeignScan(node);
+	if (result.edata) ReThrowError(result.edata);
+	return result.slot;
+}
 
-void goBeginForeignScan
-(ForeignScanState *node, int eflags);
-
-TupleTableSlot *goIterateForeignScan
-(ForeignScanState *node);
-
-void goReScanForeignScan
-(ForeignScanState *node);
-
-void goEndForeignScan
-(ForeignScanState *node);
+void
+goEndForeignScanWrapper(ForeignScanState *node)
+{
+	ErrorData *edata = goEndForeignScan(node);
+	if (edata) ReThrowError(edata);
+}
 
 #cgo LDFLAGS: -shared
 */
@@ -58,11 +64,11 @@ func Initialize(fdw FDW, fdwRoutine interface{}) {
 	// frv := reflect.ValueOf(fdwRoutine).Convert(reflect.TypeOf((*C.FdwRoutine)(nil)))
 	fr := (*C.FdwRoutine)(unsafe.Pointer(reflect.ValueOf(fdwRoutine).Pointer()))
 
-	fr.GetForeignRelSize = (C.GetForeignRelSize_function)(C.goGetForeignRelSize)
+	fr.GetForeignRelSize = (C.GetForeignRelSize_function)(C.goGetForeignRelSizeWrapper)
 	fr.GetForeignPaths = (C.GetForeignPaths_function)(C.goGetForeignPaths)
 	fr.GetForeignPlan = (C.GetForeignPlan_function)(C.goGetForeignPlan)
-	fr.BeginForeignScan = (C.BeginForeignScan_function)(C.goBeginForeignScan)
-	fr.IterateForeignScan = (C.IterateForeignScan_function)(C.goIterateForeignScan)
+	fr.BeginForeignScan = (C.BeginForeignScan_function)(C.goBeginForeignScanWrapper)
+	fr.IterateForeignScan = (C.IterateForeignScan_function)(C.goIterateForeignScanWrapper)
 	fr.ReScanForeignScan = (C.ReScanForeignScan_function)(C.goReScanForeignScan)
-	fr.EndForeignScan = (C.EndForeignScan_function)(C.goEndForeignScan)
+	fr.EndForeignScan = (C.EndForeignScan_function)(C.goEndForeignScanWrapper)
 }

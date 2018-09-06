@@ -1,0 +1,60 @@
+-- vim: set expandtab shiftwidth=2 syntax=pgsql tabstop=2 :
+\set SHOW_CONTEXT errors
+\set VERBOSITY verbose
+SET log_error_verbosity = VERBOSE;
+CREATE SERVER errors FOREIGN DATA WRAPPER go_test_fdw OPTIONS (test 'errors');
+--
+CREATE FOREIGN TABLE scan_path (id text) SERVER errors;
+--
+SELECT * FROM scan_path;
+ERROR:  XX000: bad path
+LOCATION:  github.com/cbandy/go-fdw.goGetForeignRelSize, planning.go:80
+--
+CREATE FOREIGN TABLE estimate_scan (id text) SERVER errors;
+--
+SELECT * FROM estimate_scan;
+ERROR:  XX000: bad estimate
+LOCATION:  github.com/cbandy/go-fdw.goGetForeignRelSize, planning.go:80
+--
+CREATE FOREIGN TABLE begin_scan (id text) SERVER errors;
+--
+SELECT * FROM begin_scan;
+ERROR:  XX000: bad begin
+LOCATION:  github.com/cbandy/go-fdw.goBeginForeignScan, executing.go:122
+--
+CREATE FOREIGN TABLE during_scan (id text) SERVER errors;
+--
+SELECT * FROM during_scan;
+ERROR:  XX000: bad iteration
+LOCATION:  github.com/cbandy/go-fdw.goIterateForeignScan, executing.go:154
+--
+CREATE FOREIGN TABLE bad_conversion (id integer) SERVER errors;
+--
+SELECT * FROM bad_conversion;
+ERROR:  22P02: invalid input syntax for integer: "word"
+LOCATION:  pg_atoi, numutils.c:62
+--
+CREATE FOREIGN TABLE end_scan (id text) SERVER errors;
+--
+SELECT * FROM end_scan;
+ERROR:  XX000: bad iterator close
+LOCATION:  github.com/cbandy/go-fdw.goEndForeignScan, executing.go:193
+--
+CREATE FOREIGN TABLE end_path (id text) SERVER errors;
+--
+SELECT * FROM end_path;
+ERROR:  XX000: bad path close
+LOCATION:  github.com/cbandy/go-fdw.goEndForeignScan, executing.go:197
+--
+-- cleanup
+--
+\unset VERBOSITY
+DROP SERVER errors CASCADE;
+NOTICE:  drop cascades to 7 other objects
+DETAIL:  drop cascades to foreign table scan_path
+drop cascades to foreign table estimate_scan
+drop cascades to foreign table begin_scan
+drop cascades to foreign table during_scan
+drop cascades to foreign table bad_conversion
+drop cascades to foreign table end_scan
+drop cascades to foreign table end_path

@@ -5,9 +5,7 @@ package fdw
 // Planning
 
 /*
-#include "postgres.h"
-#include "foreign/fdwapi.h"
-
+#include "go_fdw.h"
 #include "optimizer/pathnode.h"
 #include "optimizer/planmain.h"
 #include "optimizer/restrictinfo.h"
@@ -47,7 +45,7 @@ var paths = map[*C.RelOptInfo]*struct {
 var plans = map[*C.ForeignScan]ScanPath{} // TODO generic plan
 
 //export goGetForeignRelSize
-func goGetForeignRelSize(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntableid C.Oid) {
+func goGetForeignRelSize(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntableid C.Oid) *C.ErrorData {
 	log.Printf("GetForeignRelSize (%p, %p, %v)", root, baserel, foreigntableid)
 
 	if C.CurrentMemoryContext != C.MessageContext {
@@ -66,16 +64,28 @@ func goGetForeignRelSize(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntabl
 		scanPath ScanPath
 	})
 
-	state.scanPath = initialized.handler.Scan(table{foreigntableid})
-	state.scanCost = state.scanPath.Estimate(ScanCostEstimate{
-		Rows:  float64(baserel.rows),
-		Width: int(baserel.reltarget.width),
-	})
+	var err error
+	state.scanPath, err = initialized.handler.Scan(table{foreigntableid})
+
+	if err == nil {
+		state.scanCost, err = state.scanPath.Estimate(ScanCostEstimate{
+			Rows:  float64(baserel.rows),
+			Width: int(baserel.reltarget.width),
+		})
+	}
+
+	if err != nil {
+		// TODO close()?
+		initialized.handler = nil
+		return pgErrorData(err)
+	}
 
 	baserel.rows = C.double(state.scanCost.Rows)
 	baserel.reltarget.width = C.int(state.scanCost.Width)
 
 	paths[baserel] = state
+
+	return nil
 }
 
 //export goGetForeignPaths
