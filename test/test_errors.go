@@ -12,6 +12,13 @@ type errorsIterator struct {
 	row  int
 }
 
+func errorsPathError(table string) error {
+	if table == "scan_path" {
+		return errors.New("bad path")
+	}
+	return nil
+}
+
 func (p errorsPath) Estimate(cost fdw.ScanCostEstimate) (fdw.ScanCostEstimate, error) {
 	var err error
 	if p == "estimate_scan" {
