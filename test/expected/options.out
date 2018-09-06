@@ -96,10 +96,11 @@ SELECT * FROM user_options ORDER BY option;
 --
 -- cleanup
 --
-DROP SERVER few, none CASCADE;
+DROP SERVER few CASCADE;
 NOTICE:  drop cascades to 5 other objects
 DETAIL:  drop cascades to foreign table server_options
 drop cascades to foreign table table_options
 drop cascades to foreign table user_options
 drop cascades to user mapping for public on server few
 drop cascades to user mapping for postgres on server few
+DROP SERVER none CASCADE;

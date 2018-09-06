@@ -73,4 +73,5 @@ SELECT * FROM user_options ORDER BY option;
 --
 -- cleanup
 --
-DROP SERVER few, none CASCADE;
+DROP SERVER few CASCADE;
+DROP SERVER none CASCADE;
