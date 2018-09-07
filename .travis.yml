@@ -6,5 +6,7 @@ env:
   - GO_VERSION=1.10 PG_MAJOR=10
   - GO_VERSION=1.11 PG_MAJOR=9.6
   - GO_VERSION=1.11 PG_MAJOR=10
+before_script:
+  - make build-check
 script:
   - make check
