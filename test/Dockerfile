@@ -1,7 +1,7 @@
-ARG GO_VERSION=1.11
+ARG GO_VERSION
 FROM golang:${GO_VERSION}-stretch
 ARG GO_VERSION
-ARG PG_MAJOR=10
+ARG PG_MAJOR
 
 RUN export DEBIAN_FRONTEND=noninteractive \
     && curl -sS 'https://www.postgresql.org/media/keys/ACCC4CF8.asc' | apt-key add - \
