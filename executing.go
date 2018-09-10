@@ -19,7 +19,7 @@ goClearTupleSlot(TupleTableSlot *slot)
 static inline Oid
 goSlotGetTypeOid(TupleTableSlot *slot, int i)
 {
-	return slot->tts_tupleDescriptor->attrs[i]->atttypid;
+	return TupleDescAttr(slot->tts_tupleDescriptor, i)->atttypid;
 }
 
 static ErrorData *
