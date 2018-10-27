@@ -33,6 +33,14 @@ goExtractBareClauses(List *restrictinfo_list)
 {
 	return extract_actual_clauses(restrictinfo_list, false);
 }
+
+static inline List *
+goPrivatePlanId(RelOptInfo *baserel)
+{
+	List *result = list_make1_int(0);
+	list_head(result)->data.ptr_value = baserel;
+	return result;
+}
 */
 import "C"
 import "log"
@@ -42,7 +50,7 @@ var paths = map[*C.RelOptInfo]*struct {
 	scanPath ScanPath
 }{}
 
-var plans = map[*C.ForeignScan]ScanPath{} // TODO generic plan
+var plans = map[*C.RelOptInfo]ScanPath{} // TODO generic plan // TODO uintptr key would be better
 
 //export goGetForeignRelSize
 func goGetForeignRelSize(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntableid C.Oid) *C.ErrorData {
@@ -128,16 +136,16 @@ func goGetForeignPlan(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntableid
 	state := paths[baserel]
 	delete(paths, baserel)
 
-	fs := C.make_foreignscan(
+	fs := C.make_foreignscan( // optimizer/planmain.h
 		tlist,
 		C.goExtractBareClauses(scan_clauses),
 		baserel.relid,
 		nil, // TODO parameters
-		nil,
+		C.goPrivatePlanId(baserel),
 		nil, // TODO custom tlist
 		nil, // TODO remote quals
 		outer_plan)
 
-	plans[fs] = state.scanPath
+	plans[baserel] = state.scanPath
 	return fs
 }

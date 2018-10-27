@@ -101,8 +101,9 @@ func goBeginForeignScan(node *C.ForeignScanState, eflags C.int) *C.ErrorData {
 	}
 
 	fs := (*C.ForeignScan)(unsafe.Pointer(node.ss.ps.plan))
-	state := &scan{plan: plans[fs]}
-	delete(plans, fs)
+	id := *(**C.RelOptInfo)(unsafe.Pointer(&fs.fdw_private.head.data[0]))
+	state := &scan{plan: plans[id]}
+	delete(plans, id)
 
 	// TODO call the handler
 	if eflags&C.EXEC_FLAG_EXPLAIN_ONLY != 0 {
