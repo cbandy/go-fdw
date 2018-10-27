@@ -17,9 +17,9 @@ type Handler interface {
 //}
 
 type Attribute interface {
-	SetText([]byte) error   // same as SetText0, but slice is copied first to NUL-terminate
-	SetText0([]byte) error  //
 	SetString(string) error // same as SetText0, but string is copied first to NUL-terminate
+	SetText([]byte) error   // same as SetText0, but slice is copied first to NUL-terminate
+	SetText0([]byte) error
 	TypeOid() uint
 	// type name?
 }

@@ -20,13 +20,13 @@ CREATE FOREIGN TABLE begin_scan (id text) SERVER errors;
 --
 SELECT * FROM begin_scan;
 ERROR:  XX000: bad begin
-LOCATION:  github.com/cbandy/go-fdw.goBeginForeignScan, executing.go:123
+LOCATION:  github.com/cbandy/go-fdw.goBeginForeignScan, executing.go:149
 --
 CREATE FOREIGN TABLE during_scan (id text) SERVER errors;
 --
 SELECT * FROM during_scan;
 ERROR:  XX000: bad iteration
-LOCATION:  github.com/cbandy/go-fdw.goIterateForeignScan, executing.go:155
+LOCATION:  github.com/cbandy/go-fdw.goIterateForeignScan, executing.go:181
 --
 CREATE FOREIGN TABLE bad_conversion (id integer) SERVER errors;
 --
@@ -38,13 +38,13 @@ CREATE FOREIGN TABLE end_scan (id text) SERVER errors;
 --
 SELECT * FROM end_scan;
 ERROR:  XX000: bad iterator close
-LOCATION:  github.com/cbandy/go-fdw.goEndForeignScan, executing.go:194
+LOCATION:  github.com/cbandy/go-fdw.goEndForeignScan, executing.go:220
 --
 CREATE FOREIGN TABLE end_path (id text) SERVER errors;
 --
 SELECT * FROM end_path;
 ERROR:  XX000: bad path close
-LOCATION:  github.com/cbandy/go-fdw.goEndForeignScan, executing.go:198
+LOCATION:  github.com/cbandy/go-fdw.goEndForeignScan, executing.go:224
 --
 -- cleanup
 --

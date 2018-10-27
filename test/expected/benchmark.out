@@ -13,7 +13,7 @@ DO $$ BEGIN PERFORM * FROM one_column; END; $$;
 SELECT go_test_fdw_benchmark_end();
     go_test_fdw_benchmark_end    
 ---------------------------------
-     1416 B            42 allocs
+     1432 B            40 allocs
 (1 row)
 
 --
@@ -24,7 +24,7 @@ DO $$ BEGIN PERFORM * FROM four_columns; END; $$;
 SELECT go_test_fdw_benchmark_end();
     go_test_fdw_benchmark_end    
 ---------------------------------
-     1688 B            57 allocs
+     1608 B            44 allocs
 (1 row)
 
 --

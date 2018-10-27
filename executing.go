@@ -56,8 +56,15 @@ type attribute struct {
 	state *scan
 }
 
+func (a attribute) SetString(input string) error {
+	buffer := a.state.bufferCapacity(len(input) + 1)
+	buffer[len(input)] = 0
+	copy(buffer, input)
+	return a.SetText0(buffer)
+}
+
 func (a attribute) SetText(input []byte) error {
-	buffer := make([]byte, len(input)+1)
+	buffer := a.state.bufferCapacity(len(input) + 1)
 	buffer[len(input)] = 0
 	copy(buffer, input)
 	return a.SetText0(buffer)
@@ -65,13 +72,6 @@ func (a attribute) SetText(input []byte) error {
 
 func (a attribute) SetText0(input []byte) error {
 	return goErrorData(C.goSlotSetText(a.state.slot, a.state.attinmeta, a.index, (*C.char)(unsafe.Pointer(&input[0]))))
-}
-
-func (a attribute) SetString(input string) error {
-	buffer := make([]byte, len(input)+1)
-	buffer[len(input)] = 0
-	copy(buffer, input)
-	return a.SetText0(buffer)
 }
 
 func (a attribute) TypeOid() uint {
@@ -85,10 +85,36 @@ type scan struct {
 
 	attributes []Attribute
 	attinmeta  *C.AttInMetadata
+	buffer     []byte
 	slot       *C.TupleTableSlot
 }
 
 var scans = map[*C.ForeignScanState]*scan{}
+
+func (s *scan) bufferCapacity(size int) []byte {
+	old, new := len(s.buffer), len(s.buffer)
+
+	if old < size {
+		double := old + old
+
+		if double < size {
+			new = size
+		} else if old < 1024 {
+			new = double
+		} else {
+			for 0 < new && new < size {
+				new += new / 4
+			}
+			if new <= 0 {
+				new = size
+			}
+		}
+
+		s.buffer = make([]byte, new)
+	}
+
+	return s.buffer
+}
 
 //export goBeginForeignScan
 func goBeginForeignScan(node *C.ForeignScanState, eflags C.int) *C.ErrorData {
