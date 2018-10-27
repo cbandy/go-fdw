@@ -11,8 +11,8 @@ env:
     - GO_VERSION=1.11 PG_MAJOR=11
 matrix:
   allow_failures:
-    - env: GO_VERSION=1.10 PG_MAJOR=11
-    - env: GO_VERSION=1.11 PG_MAJOR=11
+    - env: GO_VERSION=1.10 PG_MAJOR=12
+    - env: GO_VERSION=1.11 PG_MAJOR=12
 before_script:
   - make build-check
 script:
