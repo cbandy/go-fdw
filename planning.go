@@ -56,9 +56,9 @@ var plans = map[*C.RelOptInfo]ScanPath{} // TODO generic plan // TODO uintptr ke
 func goGetForeignRelSize(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntableid C.Oid) *C.ErrorData {
 	log.Printf("GetForeignRelSize (%p, %p, %v)", root, baserel, foreigntableid)
 
-	if C.CurrentMemoryContext != C.MessageContext {
-		panic("Unexpected memory context")
-	}
+	// C.CurrentMemoryContext.name == "MessageContext"
+	// C.CurrentMemoryContext.name == "SPI Exec"
+
 	if _, exists := paths[baserel]; exists {
 		panic("RelOptInfo already seen")
 	}
@@ -100,9 +100,8 @@ func goGetForeignRelSize(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntabl
 func goGetForeignPaths(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntableid C.Oid) {
 	log.Printf("GetForeignPaths   (%p, %p, %v)", root, baserel, foreigntableid)
 
-	if C.CurrentMemoryContext != C.MessageContext {
-		panic("Unexpected memory context")
-	}
+	// C.CurrentMemoryContext.name == "MessageContext"
+	// C.CurrentMemoryContext.name == "SPI Exec"
 
 	state := paths[baserel]
 
@@ -129,9 +128,8 @@ func goGetForeignPlan(root *C.PlannerInfo, baserel *C.RelOptInfo, foreigntableid
 ) *C.ForeignScan {
 	log.Printf("GetForeignPlan    (%p, %p, %v, %p)", root, baserel, foreigntableid, best_path)
 
-	if C.CurrentMemoryContext != C.MessageContext {
-		panic("Unexpected memory context")
-	}
+	// C.CurrentMemoryContext.name == "MessageContext"
+	// C.CurrentMemoryContext.name == "SPI Exec"
 
 	state := paths[baserel]
 	delete(paths, baserel)

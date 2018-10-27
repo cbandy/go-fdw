@@ -51,9 +51,9 @@ var initialized struct {
 func Initialize(fdw FDW, fdwRoutine interface{}) {
 	log.Print("Initialize")
 
-	if C.CurrentMemoryContext != C.MessageContext {
-		panic("Unexpected memory context")
-	}
+	// C.CurrentMemoryContext.name == "MessageContext"
+	// C.CurrentMemoryContext.name == "SPI Exec"
+
 	if initialized.handler != nil {
 		panic("Handler already assigned")
 	}

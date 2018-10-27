@@ -1,5 +1,17 @@
 -- vim: set expandtab shiftwidth=2 syntax=pgsql tabstop=2 :
 
+CREATE FUNCTION go_test_fdw_benchmark_begin()
+  RETURNS void
+  LANGUAGE C STRICT
+AS 'MODULE_PATHNAME';
+
+CREATE FUNCTION go_test_fdw_benchmark_end()
+  RETURNS text
+  LANGUAGE C STRICT
+AS 'MODULE_PATHNAME';
+
+-- FDW
+
 CREATE FUNCTION go_test_fdw_handler()
   RETURNS fdw_handler
   LANGUAGE C STRICT

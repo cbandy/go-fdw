@@ -53,6 +53,8 @@ func (handler) Scan(t fdw.Table) (fdw.ScanPath, error) {
 	}
 
 	switch options["test"] {
+	case "benchmark":
+		return benchmarkPath(name), nil
 	case "errors":
 		return errorsPath(name), errorsPathError(name)
 	case "fdw_join":
