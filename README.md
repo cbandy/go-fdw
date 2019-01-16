@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/cbandy/go-fdw.svg?branch=master)](https://travis-ci.org/cbandy/go-fdw)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcbandy%2Fgo-fdw.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcbandy%2Fgo-fdw?ref=badge_shield)
 
 # Go-FDW
 
@@ -13,3 +14,7 @@ The API is young and very likely to change; please open [issues][] with any idea
 [issues]: https://github.com/cbandy/go-fdw/issues
 [Go]: https://golang.org/
 [PostgreSQL]: https://www.postgresql.org/
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcbandy%2Fgo-fdw.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcbandy%2Fgo-fdw?ref=badge_large)
